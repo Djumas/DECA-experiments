@@ -1,0 +1,7 @@
+{
+  "inputpath": "TestSamples/TestSetForRPY/SourceGenerations",
+  "log_filename": "rpy_evaluation.log",
+  "frame_data_filename": "step1.frame_data.json",
+  "html_report_filename": "rpy_evaluation.html",
+  "visualize": true
+}

@@ -18,6 +18,7 @@ import cv2
 import numpy as np
 from scipy.io import savemat
 import argparse
+import json
 from tqdm import tqdm
 import torch
 
@@ -28,6 +29,100 @@ from decalib.utils import util
 from decalib.utils.config import cfg as deca_cfg
 
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.bmp'}
+DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'rpy_recursive.config.json')
+CONFIG_KEYS = {
+    'inputpath', 'device', 'iscrop', 'sample_step', 'detector', 'rasterizer_type',
+    'render_orig', 'useTex', 'extractTex', 'saveVis', 'saveKpt', 'saveDepth',
+    'saveObj', 'saveMat', 'saveImages', 'saveRPY',
+}
+
+
+def str2bool(value):
+    if isinstance(value, bool):
+        return value
+    return str(value).lower() in ['true', '1']
+
+
+def load_run_config(config_path):
+    with open(config_path, 'r', encoding='utf-8') as f:
+        config = json.load(f)
+    if not isinstance(config, dict):
+        raise ValueError(f'config file must contain a JSON object: {config_path}')
+
+    unknown_keys = set(config) - CONFIG_KEYS
+    if unknown_keys:
+        print(f'warning: ignoring unknown config keys: {", ".join(sorted(unknown_keys))}')
+
+    return {key: config[key] for key in CONFIG_KEYS if key in config}
+
+
+def resolve_config_path(config_path):
+    if config_path:
+        return os.path.abspath(config_path)
+    if os.path.isfile(DEFAULT_CONFIG_PATH):
+        return DEFAULT_CONFIG_PATH
+    return None
+
+
+def build_parser():
+    parser = argparse.ArgumentParser(
+        description='DECA reconstruction with RPY angles; recursive input, per-image result folders')
+
+    parser.add_argument('-c', '--config', default=None, type=str,
+                        help='path to JSON run config; defaults to demos/rpy_recursive.config.json if present')
+    parser.add_argument('-i', '--inputpath', default='TestSamples/examples', type=str,
+                        help='root folder to scan recursively for images (.jpg, .jpeg, .png, .bmp)')
+    parser.add_argument('--device', default='cuda', type=str,
+                        help='set device, cpu for using cpu')
+    parser.add_argument('--iscrop', default=True, type=str2bool,
+                        help='whether to crop input image, set false only when the test image are well cropped')
+    parser.add_argument('--sample_step', default=10, type=int,
+                        help='sample images from video data for every step')
+    parser.add_argument('--detector', default='fan', type=str,
+                        help='detector for cropping face, check decalib/detectors.py for details')
+    parser.add_argument('--rasterizer_type', default='standard', type=str,
+                        help='rasterizer type: pytorch3d or standard')
+    parser.add_argument('--render_orig', default=True, type=str2bool,
+                        help='whether to render results in original image size, currently only works when rasterizer_type=standard')
+    parser.add_argument('--useTex', default=False, type=str2bool,
+                        help='whether to use FLAME texture model to generate uv texture map, \
+                            set it to True only if you downloaded texture model')
+    parser.add_argument('--extractTex', default=True, type=str2bool,
+                        help='whether to extract texture from input image as the uv texture map, set false if you want albeo map from FLAME mode')
+    parser.add_argument('--saveVis', default=True, type=str2bool,
+                        help='whether to save visualization of output')
+    parser.add_argument('--saveKpt', default=False, type=str2bool,
+                        help='whether to save 2D and 3D keypoints')
+    parser.add_argument('--saveDepth', default=False, type=str2bool,
+                        help='whether to save depth image')
+    parser.add_argument('--saveObj', default=False, type=str2bool,
+                        help='whether to save outputs as .obj, detail mesh will end with _detail.obj. \
+                            Note that saving objs could be slow')
+    parser.add_argument('--saveMat', default=False, type=str2bool,
+                        help='whether to save outputs as .mat')
+    parser.add_argument('--saveImages', default=False, type=str2bool,
+                        help='whether to save visualization output as seperate images')
+    parser.add_argument('--saveRPY', default=True, type=str2bool,
+                        help='whether to save Pitch, Yaw, Roll angles to a text file')
+    return parser
+
+
+def parse_args():
+    pre_parser = argparse.ArgumentParser(add_help=False)
+    pre_parser.add_argument('-c', '--config', default=None)
+    pre_args, remaining_argv = pre_parser.parse_known_args()
+
+    config_path = resolve_config_path(pre_args.config)
+    defaults = load_run_config(config_path) if config_path else {}
+
+    parser = build_parser()
+    parser.set_defaults(**defaults)
+    args = parser.parse_args(remaining_argv)
+
+    if config_path:
+        print(f'loaded run config: {config_path}')
+
+    return args
 
 
 def collect_images_recursive(root):
@@ -139,42 +234,4 @@ def main(args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(
-        description='DECA reconstruction with RPY angles; recursive input, per-image result folders')
-
-    parser.add_argument('-i', '--inputpath', default='TestSamples/examples', type=str,
-                        help='root folder to scan recursively for images (.jpg, .jpeg, .png, .bmp)')
-    parser.add_argument('--device', default='cuda', type=str,
-                        help='set device, cpu for using cpu')
-    parser.add_argument('--iscrop', default=True, type=lambda x: x.lower() in ['true', '1'],
-                        help='whether to crop input image, set false only when the test image are well cropped')
-    parser.add_argument('--sample_step', default=10, type=int,
-                        help='sample images from video data for every step')
-    parser.add_argument('--detector', default='fan', type=str,
-                        help='detector for cropping face, check decalib/detectors.py for details')
-    parser.add_argument('--rasterizer_type', default='standard', type=str,
-                        help='rasterizer type: pytorch3d or standard')
-    parser.add_argument('--render_orig', default=True, type=lambda x: x.lower() in ['true', '1'],
-                        help='whether to render results in original image size, currently only works when rasterizer_type=standard')
-    parser.add_argument('--useTex', default=False, type=lambda x: x.lower() in ['true', '1'],
-                        help='whether to use FLAME texture model to generate uv texture map, \
-                            set it to True only if you downloaded texture model')
-    parser.add_argument('--extractTex', default=True, type=lambda x: x.lower() in ['true', '1'],
-                        help='whether to extract texture from input image as the uv texture map, set false if you want albeo map from FLAME mode')
-    parser.add_argument('--saveVis', default=True, type=lambda x: x.lower() in ['true', '1'],
-                        help='whether to save visualization of output')
-    parser.add_argument('--saveKpt', default=False, type=lambda x: x.lower() in ['true', '1'],
-                        help='whether to save 2D and 3D keypoints')
-    parser.add_argument('--saveDepth', default=False, type=lambda x: x.lower() in ['true', '1'],
-                        help='whether to save depth image')
-    parser.add_argument('--saveObj', default=False, type=lambda x: x.lower() in ['true', '1'],
-                        help='whether to save outputs as .obj, detail mesh will end with _detail.obj. \
-                            Note that saving objs could be slow')
-    parser.add_argument('--saveMat', default=False, type=lambda x: x.lower() in ['true', '1'],
-                        help='whether to save outputs as .mat')
-    parser.add_argument('--saveImages', default=False, type=lambda x: x.lower() in ['true', '1'],
-                        help='whether to save visualization output as seperate images')
-    parser.add_argument('--saveRPY', default=True, type=lambda x: x.lower() in ['true', '1'],
-                        help='whether to save Pitch, Yaw, Roll angles to a text file')
-
-    main(parser.parse_args())
+    main(parse_args())

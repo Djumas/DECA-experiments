@@ -1,0 +1,18 @@
+{
+  "inputpath": "TestSamples/TestSetForRPY/SourceGenerations",
+  "device": "cuda",
+  "detector": "fan",
+  "rasterizer_type": "standard",
+  "sample_step": 10,
+  "iscrop": true,
+  "render_orig": true,
+  "useTex": false,
+  "extractTex": true,
+  "saveRPY": true,
+  "saveVis": true,
+  "saveDepth": true,
+  "saveObj": true,
+  "saveKpt": false,
+  "saveMat": false,
+  "saveImages": false
+}
