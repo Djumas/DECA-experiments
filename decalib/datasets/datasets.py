@@ -101,6 +101,7 @@ class TestData(Dataset):
             image = image[:,:,:3]
 
         h, w, _ = image.shape
+        face_detected = True
         if self.iscrop:
             # provide kpt as txt file, or mat file (for AFLW2000)
             kpt_matpath = os.path.splitext(imagepath)[0]+'.mat'
@@ -119,6 +120,7 @@ class TestData(Dataset):
                 bbox, bbox_type = self.face_detector.run(image)
                 if len(bbox) < 4:
                     print('no face detected! run original image')
+                    face_detected = False
                     left = 0; right = h-1; top=0; bottom=w-1
                 else:
                     left = bbox[0]; right=bbox[2]
@@ -140,4 +142,5 @@ class TestData(Dataset):
                 'imagename': imagename,
                 'tform': torch.tensor(tform.params).float(),
                 'original_image': torch.tensor(image.transpose(2,0,1)).float(),
+                'face_detected': face_detected,
                 }
