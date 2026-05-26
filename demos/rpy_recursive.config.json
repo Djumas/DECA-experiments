@@ -1,0 +1,13 @@
+{
+  "inputpath": "TestSamples/TestSetForRPY/SourceGenerations",
+  "device": "cuda",
+  "saveRPY": true,
+  "saveVis": true,
+  "saveDepth": true,
+  "saveObj": true,
+  "saveKpt": false,
+  "saveMat": false,
+  "saveImages": false,
+  "render_orig": true,
+  "iscrop": true
+}
